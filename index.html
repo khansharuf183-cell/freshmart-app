@@ -1,1 +1,193 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fresh Mart | ताज़ी सब्जियां</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#166534">
+<style>
+  :root { --primary: #16a34a; --primary-dark: #15803d; --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --border: #e2e8f0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding-bottom: 85px; }
+  header { background: var(--primary-dark); color: white; padding: 14px 16px; position: sticky; top: 0; z-index: 50; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .search-box { width: 100%; padding: 11px 14px; border: none; border-radius: 10px; font-size: 14px; outline: none; }
+  .categories { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; background: white; border-bottom: 1px solid var(--border); }
+  .cat-btn { background: #f1f5f9; border: 1px solid var(--border); padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .cat-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .card { background: var(--card); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+  .card img { width: 100%; height: 120px; object-fit: cover; }
+  .card-body { padding: 10px; display: flex; flex-direction: column; flex-grow: 1; }
+  .card-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .card-price { color: var(--primary-dark); font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+  .btn-add { background: var(--primary); color: white; border: none; padding: 8px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: auto; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; z-index: 99; }
+  .overlay.active { display: block; }
+  .drawer { position: fixed; right: -100%; top: 0; width: 100%; max-width: 380px; height: 100%; background: white; z-index: 100; transition: 0.3s; display: flex; flex-direction: column; }
+  .drawer.active { right: 0; }
+  .drawer-head { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 800; }
+  .drawer-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
+  .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .qty-btn { background: #f1f5f9; border: none; width: 26px; height: 26px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  .bill-box { background: #f8fafc; border-radius: 10px; padding: 12px; margin: 15px 0; font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+  .bill-row { display: flex; justify-content: space-between; }
+  .bill-total { font-weight: 800; font-size: 15px; border-top: 1px dashed var(--border); padding-top: 6px; }
+  .input-field { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; margin-bottom: 10px; outline: none; }
+  .btn-wa { background: #25d366; color: white; border: none; border-radius: 10px; padding: 12px; width: 100%; font-size: 15px; font-weight: 800; cursor: pointer; }
+  .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--border); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; z-index: 40; }
+  .btn-cart { background: var(--primary); color: white; border: none; padding: 9px 18px; border-radius: 20px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
 
+<header>
+  <div class="header-top">
+    <h1>🥦 Fresh Mart</h1>
+    <span style="font-size: 12px; opacity: 0.9;">⚡ ताज़ा डिलीवरी</span>
+  </div>
+  <input type="search" class="search-box" id="search" placeholder="सब्जी या फल खोजें..." oninput="filterItems()">
+</header>
+
+<div class="categories">
+  <button class="cat-btn active" onclick="setCategory('all', this)">सभी</button>
+  <button class="cat-btn" onclick="setCategory('veg', this)">🥕 सब्जियां</button>
+  <button class="cat-btn" onclick="setCategory('fruit', this)">🍎 फल</button>
+</div>
+
+<div class="container">
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="toggleCart(false)"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <span>🛒 आपकी बास्केट</span>
+    <button onclick="toggleCart(false)" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div id="cartList"></div>
+    <div class="bill-box">
+      <div class="bill-row"><span>सामान का मूल्य</span><span>₹<span id="subTotal">0</span></span></div>
+      <div class="bill-row"><span>डिलीवरी चार्ज</span><span>₹<span id="delCharge">20</span></span></div>
+      <div class="bill-row bill-total"><span>कुल राशि</span><span>₹<span id="finalTotal">0</span></span></div>
+    </div>
+    <input class="input-field" id="custName" placeholder="आपका नाम">
+    <input class="input-field" id="custPhone" type="tel" placeholder="मोबाइल नंबर">
+    <textarea class="input-field" id="custAddr" rows="2" placeholder="पूरा पता"></textarea>
+    <button class="btn-wa" onclick="sendOrder()">📲 WhatsApp पर ऑर्डर भेजें</button>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <span style="font-size: 13px; font-weight: 600;">Mandi Fresh</span>
+  <button class="btn-cart" onclick="toggleCart(true)">
+    कार्ट 🛒 <span id="cartCount" style="background:#ef4444;border-radius:10px;padding:1px 6px;font-size:11px;">0</span>
+  </button>
+</div>
+
+<script>
+const items = [
+  { id: 1, name: "आलू (Potato)", cat: "veg", price: 30, unit: "kg", img: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=300" },
+  { id: 2, name: "टमाटर (Tomato)", cat: "veg", price: 40, unit: "kg", img: "https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=300" },
+  { id: 3, name: "प्याज (Onion)", cat: "veg", price: 35, unit: "kg", img: "https://images.unsplash.com/photo-1508747703725-719777637510?w=300" },
+  { id: 4, name: "सेब (Apple)", cat: "fruit", price: 120, unit: "kg", img: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300" },
+  { id: 5, name: "केला (Banana)", cat: "fruit", price: 50, unit: "dozen", img: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300" }
+];
+
+const MY_WHATSAPP = "918134834380";
+let cart = [];
+let currentCat = "all";
+
+function render(data) {
+  document.getElementById("grid").innerHTML = data.map(i => `
+    <div class="card">
+      <img src="${i.img}">
+      <div class="card-body">
+        <div class="card-title">${i.name}</div>
+        <div class="card-price">₹${i.price} / ${i.unit}</div>
+        <button class="btn-add" onclick="add(${i.id})">+ जोड़ें</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function setCategory(cat, el) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentCat = cat;
+  filterItems();
+}
+
+function filterItems() {
+  const q = document.getElementById("search").value.toLowerCase();
+  render(items.filter(i => (currentCat === 'all' || i.cat === currentCat) && i.name.toLowerCase().includes(q)));
+}
+
+function add(id) {
+  const item = items.find(x => x.id === id);
+  const found = cart.find(x => x.id === id);
+  if (found) found.qty++;
+  else cart.push({ ...item, qty: 1 });
+  updateCart();
+}
+
+function changeQty(id, delta) {
+  const found = cart.find(x => x.id === id);
+  if (found) {
+    found.qty += delta;
+    if (found.qty <= 0) cart = cart.filter(x => x.id !== id);
+  }
+  updateCart();
+}
+
+function updateCart() {
+  let sub = 0, count = 0;
+  document.getElementById("cartList").innerHTML = cart.map(i => {
+    sub += i.price * i.qty;
+    count += i.qty;
+    return `
+      <div class="cart-item">
+        <div><b>${i.name}</b><br><span style="color:#64748b;">₹${i.price} × ${i.qty}</span></div>
+        <div>
+          <button class="qty-btn" onclick="changeQty(${i.id}, -1)">−</button>
+          <span style="margin:0 6px; font-weight:bold;">${i.qty}</span>
+          <button class="qty-btn" onclick="changeQty(${i.id}, 1)">+</button>
+        </div>
+      </div>
+    `;
+  }).join("") || "<p style='color:#64748b;text-align:center;padding:20px;'>कार्ट खाली है</p>";
+
+  const del = sub > 200 || sub === 0 ? 0 : 20;
+  document.getElementById("subTotal").innerText = sub;
+  document.getElementById("delCharge").innerText = del;
+  document.getElementById("finalTotal").innerText = sub + del;
+  document.getElementById("cartCount").innerText = count;
+}
+
+function toggleCart(open) {
+  document.getElementById("drawer").classList.toggle("active", open);
+  document.getElementById("overlay").classList.toggle("active", open);
+}
+
+function sendOrder() {
+  if (cart.length === 0) return alert("कार्ट खाली है!");
+  const name = document.getElementById("custName").value.trim();
+  const phone = document.getElementById("custPhone").value.trim();
+  const addr = document.getElementById("custAddr").value.trim();
+  if (!name || !phone || !addr) return alert("कृपया सभी जानकारी भरें!");
+
+  let text = `🛒 *नया Fresh Mart ऑर्डर*\n\n`;
+  cart.forEach(i => text += `• ${i.name} - ${i.qty} ${i.unit} (₹${i.price * i.qty})\n`);
+  text += `\n📦 डिलीवरी: ₹${document.getElementById("delCharge").innerText}`;
+  text += `\n💰 *कुल बिल: ₹${document.getElementById("finalTotal").innerText}*\n\n`;
+  text += `👤 *नाम:* ${name}\n📱 *फोन:* ${phone}\n📍 *पता:* ${addr}`;
+  window.open(`https://wa.me/${MY_WHATSAPP}?text=${encodeURIComponent(text)}`, "_blank");
+}
+
+render(items);
+</script>
+</body>
+</html>
